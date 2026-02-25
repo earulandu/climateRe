@@ -10,7 +10,7 @@ STATE_FILE = '.ensemble_state.json'
 
 
 def write_sbatch(work_dir, base_name, count):
-    """Generate individual #submit.sbatch files for each ensemble member."""
+    """Generate individual #batch.sbatch files for each ensemble member."""
     template_path = os.path.join(work_dir, '..', 'header.sbatch')
     srun_prefix = "srun -n 64 regcmMPI"
 
@@ -39,10 +39,10 @@ def write_sbatch(work_dir, base_name, count):
 
     for n in range(1, count + 1):
         individual_lines = header_lines + ["", f"{srun_prefix} {n}{base_name}", ""]
-        out_path = os.path.join(work_dir, f"{n}submit.sbatch")
+        out_path = os.path.join(work_dir, f"{n}batch.sbatch")
         with open(out_path, 'w') as f:
             f.write('\n'.join(individual_lines))
-        print(f"Created: {n}submit.sbatch")
+        print(f"Created: {n}batch.sbatch")
 
 
 def run_cmd(cmd, cwd):
@@ -70,28 +70,68 @@ def load_state(work_dir):
         return json.load(f)
 
 
+def submit_sbatch(work_dir):
+    """Submit all *batch.sbatch files in numeric order."""
+    sbatch_files = sorted(
+        [f for f in os.listdir(work_dir) if re.match(r'^\d+batch\.sbatch$', f)],
+        key=lambda f: int(re.match(r'^(\d+)', f).group(1))
+    )
+    if not sbatch_files:
+        print("Error: no *batch.sbatch files found in current directory.")
+        sys.exit(1)
+
+    print(f"Submitting {len(sbatch_files)} job(s)...")
+    for fname in sbatch_files:
+        result = subprocess.run(['sbatch', fname], cwd=work_dir, capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f"Error submitting {fname}: {result.stderr.strip()}")
+            sys.exit(result.returncode)
+        print(f"  {fname}: {result.stdout.strip()}")
+
+
+def find_first_member(work_dir, base_name):
+    """Return the lowest numeric prefix of existing <n><base_name> .in files."""
+    candidates = []
+    for fname in os.listdir(work_dir):
+        if fname.endswith(base_name) and fname != base_name:
+            prefix = fname[:-len(base_name)]
+            if prefix.isdigit():
+                candidates.append(int(prefix))
+    if not candidates:
+        print(f"Error: no ensemble member files found matching *{base_name}")
+        sys.exit(1)
+    return min(candidates)
+
+
 def main():
     work_dir = os.getcwd()
 
+    # ── sbatch submit mode ────────────────────────────────────────────────────
+    if len(sys.argv) == 2 and sys.argv[1] == 'sbatch':
+        submit_sbatch(work_dir)
+
     # ── continue mode ─────────────────────────────────────────────────────────
-    if len(sys.argv) == 2 and sys.argv[1] == 'continue':
+    elif len(sys.argv) == 2 and sys.argv[1] == 'continue':
         state = load_state(work_dir)
         base_name    = state['base_name']
         count        = state['count']
         base_domname = state['base_domname']
 
-        m1_in_file   = f"1{base_name}"
-        m1_domname   = f"1{base_domname}"
-        m1_input_dir = os.path.join(work_dir, "1input")
+        first_n      = find_first_member(work_dir, base_name)
+        m1_in_file   = f"{first_n}{base_name}"
+        m1_domname   = f"{first_n}{base_domname}"
+        m1_input_dir = os.path.join(work_dir, f"{first_n}input")
 
-        print(f"Resuming: running sst and icbc for member 1 ({m1_in_file})...")
+        print(f"Resuming: running sst and icbc for member {first_n} ({m1_in_file})...")
         for cmd_name in ["sst", "icbc"]:
             run_cmd([cmd_name, m1_in_file], work_dir)
 
         if count > 1:
-            print(f"\nCopying input files from 1input to members 2-{count}...")
+            print(f"\nCopying input files from {first_n}input to other members...")
             src_files = os.listdir(m1_input_dir)
-            for n in range(2, count + 1):
+            for n in range(1, count + 1):
+                if n == first_n:
+                    continue
                 m_domname   = f"{n}{base_domname}"
                 m_input_dir = os.path.join(work_dir, f"{n}input")
                 for fname in src_files:
@@ -106,7 +146,7 @@ def main():
         print(f"\nDone. All {count} ensemble members ready.")
 
     # ── initial setup mode ────────────────────────────────────────────────────
-    elif len(sys.argv) == 3:
+    elif len(sys.argv) == 3 and sys.argv[1] != 'continue' and sys.argv[1] != 'sbatch':
         base_file = sys.argv[1]
         count     = int(sys.argv[2])
 
@@ -156,6 +196,7 @@ def main():
         print("Usage:")
         print(f"  python3 {os.path.basename(sys.argv[0])} <base_file> <count>   # setup + terrain")
         print(f"  python3 {os.path.basename(sys.argv[0])} continue               # resume after editing")
+        print(f"  python3 {os.path.basename(sys.argv[0])} sbatch                 # submit all batch jobs")
         sys.exit(1)
 
 

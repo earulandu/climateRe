@@ -7,7 +7,7 @@ import shutil
 
 
 def write_sbatch(work_dir, base_name, count):
-    """Generate individual #submit.sbatch files for each ensemble member."""
+    """Generate individual #batch.sbatch files for each ensemble member."""
     template_path = os.path.join(work_dir, '..', 'header.sbatch')
     srun_prefix = "srun -n 64 regcmMPI"
 
@@ -36,10 +36,29 @@ def write_sbatch(work_dir, base_name, count):
 
     for n in range(1, count + 1):
         individual_lines = header_lines + ["", f"{srun_prefix} {n}{base_name}", ""]
-        out_path = os.path.join(work_dir, f"{n}submit.sbatch")
+        out_path = os.path.join(work_dir, f"{n}batch.sbatch")
         with open(out_path, 'w') as f:
             f.write('\n'.join(individual_lines))
-        print(f"Created: {n}submit.sbatch")
+        print(f"Created: {n}batch.sbatch")
+
+
+def submit_sbatch(work_dir):
+    """Submit all *batch.sbatch files in numeric order."""
+    sbatch_files = sorted(
+        [f for f in os.listdir(work_dir) if re.match(r'^\d+batch\.sbatch$', f)],
+        key=lambda f: int(re.match(r'^(\d+)', f).group(1))
+    )
+    if not sbatch_files:
+        print("Error: no *batch.sbatch files found in current directory.")
+        sys.exit(1)
+
+    print(f"Submitting {len(sbatch_files)} job(s)...")
+    for fname in sbatch_files:
+        result = subprocess.run(['sbatch', fname], cwd=work_dir, capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f"Error submitting {fname}: {result.stderr.strip()}")
+            sys.exit(result.returncode)
+        print(f"  {fname}: {result.stdout.strip()}")
 
 
 def run_cmd(cmd, cwd):
@@ -52,8 +71,16 @@ def run_cmd(cmd, cwd):
 
 
 def main():
+    work_dir = os.getcwd()
+
+    if len(sys.argv) == 2 and sys.argv[1] == 'sbatch':
+        submit_sbatch(work_dir)
+        return
+
     if len(sys.argv) != 3:
-        print("Usage: python3 setupensemble.py <base_file> <count>")
+        print("Usage:")
+        print(f"  python3 {os.path.basename(sys.argv[0])} <base_file> <count>   # setup + run all preprocessing")
+        print(f"  python3 {os.path.basename(sys.argv[0])} sbatch                 # submit all batch jobs")
         sys.exit(1)
 
     base_file = sys.argv[1]
@@ -64,7 +91,6 @@ def main():
         sys.exit(1)
 
     base_name = os.path.basename(base_file)
-    work_dir = os.getcwd()
 
     with open(base_file, 'r') as f:
         content = f.read()
@@ -126,7 +152,7 @@ def main():
                 shutil.copy2(src, os.path.join(m_input_dir, new_fname))
                 print(f"  {n}input/{new_fname}")
 
-    # Generate individual submit sbatch files for each ensemble member
+    # Generate individual batch sbatch files for each ensemble member
     write_sbatch(work_dir, base_name, count)
 
     print(f"\nDone. All {count} ensemble members ready.")

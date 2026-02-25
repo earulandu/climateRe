@@ -12,12 +12,16 @@ np.set_printoptions(threshold=500)
 ## threshold=5000
 ## threshold=np.inf
 
-# Find .in file and extract domname
+# Find .in file and extract domname — pick the one with the lowest numeric prefix
 in_files = glob.glob('*.in')
 if not in_files:
     raise FileNotFoundError("No .in file found in the current directory")
 
-in_file = in_files[0]  # Use first .in file found
+def _numeric_prefix(fname):
+    m = re.match(r'^(\d+)', fname)
+    return int(m.group(1)) if m else float('inf')
+
+in_file = min(in_files, key=_numeric_prefix)
 print(f"Using config file: {in_file}")
 
 with open(in_file, 'r') as f:
