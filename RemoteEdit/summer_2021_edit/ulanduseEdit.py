@@ -36,12 +36,14 @@ else:
     in_files = glob.glob('*.in')
     if not in_files:
         raise FileNotFoundError("No .in file found in the current directory")
-    if len(in_files) > 1:
-        print("Multiple .in files found. Specify one as an argument:")
-        for f in in_files:
-            print(f"  python3 ulanduseEdit.py {f}")
-        sys.exit(1)
+    # Sort numerically by leading digits, then alphabetically; pick the lowest
+    def _in_sort_key(name):
+        m = re.match(r'^(\d+)', name)
+        return (int(m.group(1)) if m else float('inf'), name)
+    in_files.sort(key=_in_sort_key)
     in_file = in_files[0]
+    if len(in_files) > 1:
+        print(f"Multiple .in files found; using lowest-numbered: {in_file}")
 
 with open(in_file, 'r') as f:
     content = f.read()
