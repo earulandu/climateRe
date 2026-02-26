@@ -1,26 +1,43 @@
 import os
 import shutil
 import subprocess
+import sys
 
 BASE_SRC = "/N/u/earuland/Quartz/thindrives/climateRe/basefiles"
 UTILS_SRC = "/N/u/earuland/Quartz/thindrives/climateRe/utils"
 
 
-def setupdir(dest):
+def setup_edit_dir(dest, name):
+    edit_dir = os.path.join(dest, name)
+    os.makedirs(os.path.join(edit_dir, "analysis"), exist_ok=True)
+    shutil.copy(os.path.join(UTILS_SRC, "ueditsetupEnsemble.py"), edit_dir)
+    shutil.copy(os.path.join(UTILS_SRC, "ncesanalysis.py"), os.path.join(edit_dir, "analysis"))
+
+
+def setupdir(dest, num_edits=1):
     os.makedirs(dest, exist_ok=True)
 
     shutil.copy(os.path.join(BASE_SRC, "btown_000.in"), dest)
     shutil.copy(os.path.join(BASE_SRC, "header.sbatch"), dest)
 
     base_dir = os.path.join(dest, "base")
-    edit_dir = os.path.join(dest, "edit")
     os.makedirs(os.path.join(base_dir, "analysis"), exist_ok=True)
-    os.makedirs(os.path.join(edit_dir, "analysis"), exist_ok=True)
-
     shutil.copy(os.path.join(UTILS_SRC, "ubasesetupEnsemble.py"), base_dir)
-    shutil.copy(os.path.join(UTILS_SRC, "ueditsetupEnsemble.py"), edit_dir)
     shutil.copy(os.path.join(UTILS_SRC, "ncesanalysis.py"), os.path.join(base_dir, "analysis"))
-    shutil.copy(os.path.join(UTILS_SRC, "ncesanalysis.py"), os.path.join(edit_dir, "analysis"))
+
+    if num_edits == 1:
+        setup_edit_dir(dest, "edit")
+        edit_labels = ["edit"]
+    else:
+        for i in range(1, num_edits + 1):
+            setup_edit_dir(dest, f"{i}edit")
+        edit_labels = [f"{i}edit" for i in range(1, num_edits + 1)]
+
+    changes_path = os.path.join(dest, "edit_doc.txt")
+    with open(changes_path, "w") as f:
+        f.write("base:\n")
+        for label in edit_labels:
+            f.write(f"{label}:\n")
 
 
 if __name__ == '__main__':
@@ -34,4 +51,9 @@ if __name__ == '__main__':
         shell=True,
         executable='/bin/bash'
     )
-    setupdir(os.getcwd())
+
+    num_edits = 1
+    if len(sys.argv) > 1:
+        num_edits = int(sys.argv[1])
+
+    setupdir(os.getcwd(), num_edits)

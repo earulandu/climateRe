@@ -5,6 +5,7 @@ from matplotlib.widgets import RectangleSelector, TextBox, Button
 import glob
 import re
 import os
+from datetime import datetime
 
 np.set_printoptions(threshold=500)
 
@@ -50,6 +51,15 @@ for line in legend_text.strip().split('\n'):
     legend_dict[int(parts[0].strip())] = parts[1].strip()
 
 landuse_data = landuse[:]
+
+DOC_FILE = 'landuse_doc.txt'
+_apply_count = [0]
+_last_region = [None]  # stores (x_min, y_min, x_max, y_max) from last selection
+
+def _log(lines):
+    with open(DOC_FILE, 'a') as f:
+        f.write('\n'.join(lines) + '\n')
+
 fig, (ax, ax_legend) = plt.subplots(1, 2, figsize=(14, 8), gridspec_kw={'width_ratios': [3, 1]})
 plt.subplots_adjust(bottom=0.2, right=0.95, left=0.05)
 im = ax.imshow(landuse_data, cmap='gray', origin='lower')
@@ -89,6 +99,7 @@ def on_select(eclick, erelease):
     y_min, y_max = min(y1, y2), max(y1, y2)
 
     selected_points.clear()
+    _last_region[0] = (x_min, y_min, x_max, y_max)
     print(f"\nSelected region: ({x_min}, {y_min}) to ({x_max}, {y_max})")
     print("Points selected:")
     for row in range(y_min, y_max + 1):
@@ -152,17 +163,54 @@ def apply_changes(event):
 
     print(f"\nChanged {num_to_change} points to {new_val} - {legend_dict[new_val]}")
 
+    _apply_count[0] += 1
+    ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    total = len(selected_points)
+    region = _last_region[0]
+    region_str = f'({region[0]}, {region[1]}) to ({region[2]}, {region[3]})' if region else 'unknown'
+    orig_values = set(p[2] for p in selected_points)
+    orig_breakdown = [
+        f'      {v:3d} - {legend_dict.get(v, "Unknown"):30s}: {sum(1 for p in selected_points if p[2] == v):6d} pts  ({100 * sum(1 for p in selected_points if p[2] == v) / total:.1f}%)'
+        for v in sorted(orig_values)
+    ]
+    _log(
+        [f'',
+         f'  APPLY #{_apply_count[0]}  [{ts}]',
+         f'    Region          : {region_str}',
+         f'    Total points    : {total}',
+         f'    Original landuse breakdown:']
+        + orig_breakdown +
+        [f'    New landuse     : {new_val} - {legend_dict[new_val]}',
+         f'    Percent applied : {percent:.1f}%',
+         f'    Points changed  : {num_to_change} / {total}']
+    )
+
 btn_apply.on_clicked(apply_changes)
 
 def save_changes(event):
     landuse[:] = landuse_data
     data.sync()
     print(f"\nSaved changes to {filename}")
+    ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    _log([f'', f'  SAVED [{ts}] -> {filename}', f'  ' + '-' * 56])
 
 btn_save.on_clicked(save_changes)
 
 print("\nLanduse legend:")
 for k, v in legend_dict.items():
     print(f"  {k} - {v}")
+
+# Write session header to landuse_doc.txt
+_session_start = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+_log(
+    ['',
+     '=' * 60,
+     f'SESSION : {_session_start}',
+     f'Config  : {in_file}',
+     f'Domain  : {domname}',
+     f'File    : {filename}',
+     f'Grid    : {landuse_data.shape[0]} rows x {landuse_data.shape[1]} cols  ({landuse_data.size} total points)',
+     '-' * 60]
+)
 
 plt.show()
