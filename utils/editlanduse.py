@@ -23,7 +23,7 @@ def _numeric_prefix(fname):
     return int(m.group(1)) if m else float('inf')
 
 in_file = min(in_files, key=_numeric_prefix)
-print(f"Using config file: {in_file}")
+print(f"config   {in_file}")
 
 with open(in_file, 'r') as f:
     content = f.read()
@@ -34,12 +34,12 @@ if not match:
     raise ValueError(f"Could not find domname in {in_file}")
 
 domname = match.group(1)
-print(f"Found domname: {domname}")
+print(f"domain   {domname}")
 
 dirter_match = re.search(r"dirter\s*=\s*['\"]([^'\"]+)['\"]", content)
 dirter = dirter_match.group(1) if dirter_match else './input'
 filename = os.path.join(dirter, f'{domname}_DOMAIN000.nc')
-print(f"Opening: {filename}")
+print(f"file     {filename}")
 
 data = nc.Dataset(filename, 'r+')
 landuse = data['landuse']
@@ -100,21 +100,17 @@ def on_select(eclick, erelease):
 
     selected_points.clear()
     _last_region[0] = (x_min, y_min, x_max, y_max)
-    print(f"\nSelected region: ({x_min}, {y_min}) to ({x_max}, {y_max})")
-    print("Points selected:")
     for row in range(y_min, y_max + 1):
         for col in range(x_min, x_max + 1):
             if 0 <= row < landuse_data.shape[0] and 0 <= col < landuse_data.shape[1]:
                 val = int(landuse_data[row, col])
-                name = legend_dict.get(val, 'Unknown')
                 selected_points.append((row, col, val))
 
-    print(f"Total points: {len(selected_points)}")
+    print(f"\nselect  ({x_min},{y_min})-({x_max},{y_max})  {len(selected_points)} pts")
     values = set(p[2] for p in selected_points)
-    print("Landuse types in selection:")
     for v in sorted(values):
         count = sum(1 for p in selected_points if p[2] == v)
-        print(f"  {v} - {legend_dict.get(v, 'Unknown')}: {count} points")
+        print(f"  {v:2d} {legend_dict.get(v, 'Unknown')}: {count}")
 
 selector = RectangleSelector(ax, on_select, useblit=True, button=[1],
                              interactive=True)
@@ -161,7 +157,7 @@ def apply_changes(event):
     im.set_data(landuse_data)
     fig.canvas.draw_idle()
 
-    print(f"\nChanged {num_to_change} points to {new_val} - {legend_dict[new_val]}")
+    print(f"apply   {num_to_change} pts -> {new_val} ({legend_dict[new_val]})")
 
     _apply_count[0] += 1
     ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -190,15 +186,15 @@ btn_apply.on_clicked(apply_changes)
 def save_changes(event):
     landuse[:] = landuse_data
     data.sync()
-    print(f"\nSaved changes to {filename}")
+    print(f"saved   {filename}")
     ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     _log([f'', f'  SAVED [{ts}] -> {filename}', f'  ' + '-' * 56])
 
 btn_save.on_clicked(save_changes)
 
-print("\nLanduse legend:")
+print("\nlegend:")
 for k, v in legend_dict.items():
-    print(f"  {k} - {v}")
+    print(f"  {k:2d}  {v}")
 
 # Write session header to landuse_doc.txt
 _session_start = datetime.now().strftime('%Y-%m-%d %H:%M:%S')

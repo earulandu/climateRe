@@ -39,7 +39,7 @@ def write_sbatch(work_dir, base_name, count):
         out_path = os.path.join(work_dir, f"{n}batch.sbatch")
         with open(out_path, 'w') as f:
             f.write('\n'.join(individual_lines))
-        print(f"Created: {n}batch.sbatch")
+    print(f"  sbatch  {count} batch files")
 
 
 def submit_sbatch(work_dir):
@@ -52,22 +52,22 @@ def submit_sbatch(work_dir):
         print("Error: no *batch.sbatch files found in current directory.")
         sys.exit(1)
 
-    print(f"Submitting {len(sbatch_files)} job(s)...")
+    print(f"submit  {len(sbatch_files)} jobs")
     for fname in sbatch_files:
         result = subprocess.run(['sbatch', fname], cwd=work_dir, capture_output=True, text=True)
         if result.returncode != 0:
-            print(f"Error submitting {fname}: {result.stderr.strip()}")
+            print(f"  error: {fname}  {result.stderr.strip()}")
             sys.exit(result.returncode)
-        print(f"  {fname}: {result.stdout.strip()}")
+        print(f"  {fname}  {result.stdout.strip()}")
 
 
 def run_cmd(cmd, cwd):
-    print(f"  Running: {' '.join(cmd)}")
+    print(f"  {cmd[0]}...")
     result = subprocess.run(cmd, cwd=cwd)
     if result.returncode != 0:
-        print(f"Error: '{' '.join(cmd)}' failed with exit code {result.returncode}")
+        print(f"  error: {cmd[0]} failed (exit {result.returncode})")
         sys.exit(result.returncode)
-    print(f"  Done: {cmd[0]}")
+    print(f"  done")
 
 
 def main():
@@ -78,16 +78,16 @@ def main():
         return
 
     if len(sys.argv) != 3:
-        print("Usage:")
-        print(f"  python3 {os.path.basename(sys.argv[0])} <base_file> <count>   # setup + run all preprocessing")
-        print(f"  python3 {os.path.basename(sys.argv[0])} sbatch                 # submit all batch jobs")
+        print("usage:")
+        print(f"  python3 {os.path.basename(sys.argv[0])} <base_file> <count>   # setup")
+        print(f"  python3 {os.path.basename(sys.argv[0])} sbatch                 # submit jobs")
         sys.exit(1)
 
     base_file = sys.argv[1]
     count = int(sys.argv[2])
 
     if not os.path.isfile(base_file):
-        print(f"Error: file not found: {base_file}")
+        print(f"error: {base_file} not found")
         sys.exit(1)
 
     base_name = os.path.basename(base_file)
@@ -95,8 +95,8 @@ def main():
     with open(base_file, 'r') as f:
         content = f.read()
 
+    print(f"setup  {base_name}  ({count} members)")
     for n in range(1, count + 1):
-        # Create numbered input and output directories
         os.makedirs(os.path.join(work_dir, f'{n}input'), exist_ok=True)
         os.makedirs(os.path.join(work_dir, f'{n}output'), exist_ok=True)
 
@@ -126,7 +126,7 @@ def main():
         with open(out_path, 'w') as f:
             f.write(new_content)
 
-        print(f"Created: {n}{base_name}  {n}input/  {n}output/")
+        print(f"  + {n}{base_name}  {n}input/  {n}output/")
 
     # Parse the base domname to know what prefix terrain/sst/icbc will use
     base_domname = re.search(r"domname\s*=\s*'([^']*)'", content).group(1)
@@ -134,14 +134,12 @@ def main():
     m1_domname = f"1{base_domname}"
     m1_input_dir = os.path.join(work_dir, "1input")
 
-    # Run terrain, sst, icbc sequentially for member 1
-    print(f"\nRunning preprocessing for member 1 ({m1_in_file})...")
+    print(f"\npreprocess  {m1_in_file}")
     for cmd_name in ["terrain", "sst", "icbc"]:
         run_cmd([cmd_name, m1_in_file], work_dir)
 
-    # Copy and rename files from 1input to {n}input for members 2..count
     if count > 1:
-        print(f"\nCopying input files from 1input to members 2-{count}...")
+        print(f"\ncopy  1input -> members 2-{count}")
         src_files = os.listdir(m1_input_dir)
         for n in range(2, count + 1):
             m_domname = f"{n}{base_domname}"
@@ -150,12 +148,11 @@ def main():
                 src = os.path.join(m1_input_dir, fname)
                 new_fname = m_domname + fname[len(m1_domname):] if fname.startswith(m1_domname) else fname
                 shutil.copy2(src, os.path.join(m_input_dir, new_fname))
-                print(f"  {n}input/{new_fname}")
+            print(f"  {n}input  ({len(src_files)} files)")
 
-    # Generate individual batch sbatch files for each ensemble member
     write_sbatch(work_dir, base_name, count)
 
-    print(f"\nDone. All {count} ensemble members ready.")
+    print(f"\ndone  {count} members ready")
 
 
 if __name__ == '__main__':

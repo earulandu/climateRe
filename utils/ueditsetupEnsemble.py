@@ -42,16 +42,16 @@ def write_sbatch(work_dir, base_name, count):
         out_path = os.path.join(work_dir, f"{n}batch.sbatch")
         with open(out_path, 'w') as f:
             f.write('\n'.join(individual_lines))
-        print(f"Created: {n}batch.sbatch")
+    print(f"  sbatch  {count} batch files")
 
 
 def run_cmd(cmd, cwd):
-    print(f"  Running: {' '.join(cmd)}")
+    print(f"  {cmd[0]}...")
     result = subprocess.run(cmd, cwd=cwd)
     if result.returncode != 0:
-        print(f"Error: '{' '.join(cmd)}' failed with exit code {result.returncode}")
+        print(f"  error: {cmd[0]} failed (exit {result.returncode})")
         sys.exit(result.returncode)
-    print(f"  Done: {cmd[0]}")
+    print(f"  done")
 
 
 def save_state(work_dir, base_name, count, base_domname):
@@ -80,13 +80,13 @@ def submit_sbatch(work_dir):
         print("Error: no *batch.sbatch files found in current directory.")
         sys.exit(1)
 
-    print(f"Submitting {len(sbatch_files)} job(s)...")
+    print(f"submit  {len(sbatch_files)} jobs")
     for fname in sbatch_files:
         result = subprocess.run(['sbatch', fname], cwd=work_dir, capture_output=True, text=True)
         if result.returncode != 0:
-            print(f"Error submitting {fname}: {result.stderr.strip()}")
+            print(f"  error: {fname}  {result.stderr.strip()}")
             sys.exit(result.returncode)
-        print(f"  {fname}: {result.stdout.strip()}")
+        print(f"  {fname}  {result.stdout.strip()}")
 
 
 def find_first_member(work_dir, base_name):
@@ -122,12 +122,12 @@ def main():
         m1_domname   = f"{first_n}{base_domname}"
         m1_input_dir = os.path.join(work_dir, f"{first_n}input")
 
-        print(f"Resuming: running sst and icbc for member {first_n} ({m1_in_file})...")
+        print(f"continue  member {first_n}  ({m1_in_file})")
         for cmd_name in ["sst", "icbc"]:
             run_cmd([cmd_name, m1_in_file], work_dir)
 
         if count > 1:
-            print(f"\nCopying input files from {first_n}input to other members...")
+            print(f"\ncopy  {first_n}input -> other members")
             src_files = os.listdir(m1_input_dir)
             for n in range(1, count + 1):
                 if n == first_n:
@@ -138,12 +138,12 @@ def main():
                     src = os.path.join(m1_input_dir, fname)
                     new_fname = m_domname + fname[len(m1_domname):] if fname.startswith(m1_domname) else fname
                     shutil.copy2(src, os.path.join(m_input_dir, new_fname))
-                    print(f"  {n}input/{new_fname}")
+                print(f"  {n}input  ({len(src_files)} files)")
 
         write_sbatch(work_dir, base_name, count)
 
         os.remove(os.path.join(work_dir, STATE_FILE))
-        print(f"\nDone. All {count} ensemble members ready.")
+        print(f"\ndone  {count} members ready")
 
     # ── initial setup mode ────────────────────────────────────────────────────
     elif len(sys.argv) == 3 and sys.argv[1] != 'continue' and sys.argv[1] != 'sbatch':
@@ -151,7 +151,7 @@ def main():
         count     = int(sys.argv[2])
 
         if not os.path.isfile(base_file):
-            print(f"Error: file not found: {base_file}")
+            print(f"error: {base_file} not found")
             sys.exit(1)
 
         base_name = os.path.basename(base_file)
@@ -159,6 +159,7 @@ def main():
         with open(base_file, 'r') as f:
             content = f.read()
 
+        print(f"setup  {base_name}  ({count} members)")
         for n in range(1, count + 1):
             os.makedirs(os.path.join(work_dir, f'{n}input'), exist_ok=True)
             os.makedirs(os.path.join(work_dir, f'{n}output'), exist_ok=True)
@@ -176,27 +177,27 @@ def main():
             with open(out_path, 'w') as f:
                 f.write(new_content)
 
-            print(f"Created: {n}{base_name}  {n}input/  {n}output/")
+            print(f"  + {n}{base_name}  {n}input/  {n}output/")
 
         base_domname = re.search(r"domname\s*=\s*'([^']*)'", content).group(1)
         m1_in_file   = f"1{base_name}"
 
-        print(f"\nRunning terrain for member 1 ({m1_in_file})...")
+        print(f"\nterrain  {m1_in_file}")
         run_cmd(["terrain", m1_in_file], work_dir)
 
         run_cmd(["cp", "/N/u/earuland/Quartz/thindrives/climateRe/utils/editlanduse.py", "."], work_dir)
 
         save_state(work_dir, base_name, count, base_domname)
 
-        print(f"\nTerrain complete. Edit 1input/ now, then run:")
+        print(f"\npause  edit 1input/, then run:")
         print(f"  python3 {os.path.basename(sys.argv[0])} continue")
 
     # ── bad usage ─────────────────────────────────────────────────────────────
     else:
-        print("Usage:")
-        print(f"  python3 {os.path.basename(sys.argv[0])} <base_file> <count>   # setup + terrain")
-        print(f"  python3 {os.path.basename(sys.argv[0])} continue               # resume after editing")
-        print(f"  python3 {os.path.basename(sys.argv[0])} sbatch                 # submit all batch jobs")
+        print("usage:")
+        print(f"  python3 {os.path.basename(sys.argv[0])} <base_file> <count>   # setup")
+        print(f"  python3 {os.path.basename(sys.argv[0])} continue               # resume")
+        print(f"  python3 {os.path.basename(sys.argv[0])} sbatch                 # submit")
         sys.exit(1)
 
 
