@@ -54,7 +54,7 @@ def submit_sbatch(work_dir):
 
     print(f"submit  {len(sbatch_files)} jobs")
     for fname in sbatch_files:
-        result = subprocess.run(['sbatch', fname], cwd=work_dir, capture_output=True, text=True)
+        result = subprocess.run(['sbatch', fname], cwd=work_dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
         if result.returncode != 0:
             print(f"  error: {fname}  {result.stderr.strip()}")
             sys.exit(result.returncode)

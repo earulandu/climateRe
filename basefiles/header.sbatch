@@ -3,7 +3,7 @@
 #SBATCH -p general
 #SBATCH -N 1
 #SBATCH -n 64
-#SBATCH -t 240
+#SBATCH -t 360
 #SBATCH --mem=128GB
 
 module use /N/slate/obrienta/software/quartz/modulefiles
