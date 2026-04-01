@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls /Users/elijaharulandu/Desktop/climateRe/*.nc)",
+      "Bash(find /Users/elijaharulandu/Desktop/climateRe -name *.nc)"
+    ]
+  }
+}

@@ -63,7 +63,9 @@ def submit_sbatch(work_dir):
 
 def run_cmd(cmd, cwd):
     print(f"  {cmd[0]}...")
-    result = subprocess.run(cmd, cwd=cwd)
+    module_setup = "module use /N/slate/obrienta/software/quartz/modulefiles && module load regcm"
+    shell_cmd = f"{module_setup} && {' '.join(cmd)}"
+    result = subprocess.run(["bash", "-c", shell_cmd], cwd=cwd)
     if result.returncode != 0:
         print(f"  error: {cmd[0]} failed (exit {result.returncode})")
         sys.exit(result.returncode)

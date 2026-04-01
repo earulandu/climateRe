@@ -47,12 +47,12 @@ def setupdir(dest, num_edits=1):
 
 if __name__ == '__main__':
     subprocess.run(
-        'module use /N/slate/obrienta/software/quartz/modulefiles && module load regcm',
+        'module load conda && conda activate /N/slate/$USER/conda_envs/easg690',
         shell=True,
         executable='/bin/bash'
     )
     subprocess.run(
-        'module load conda && conda activate /N/slate/$USER/conda_envs/easg690',
+        'module use /N/slate/obrienta/software/quartz/modulefiles && module load regcm',
         shell=True,
         executable='/bin/bash'
     )

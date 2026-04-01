@@ -47,7 +47,9 @@ def write_sbatch(work_dir, base_name, count):
 
 def run_cmd(cmd, cwd):
     print(f"  {cmd[0]}...")
-    result = subprocess.run(cmd, cwd=cwd)
+    module_setup = "module use /N/slate/obrienta/software/quartz/modulefiles && module load regcm"
+    shell_cmd = f"{module_setup} && {' '.join(cmd)}"
+    result = subprocess.run(["bash", "-c", shell_cmd], cwd=cwd)
     if result.returncode != 0:
         print(f"  error: {cmd[0]} failed (exit {result.returncode})")
         sys.exit(result.returncode)
@@ -190,6 +192,7 @@ def main():
         save_state(work_dir, base_name, count, base_domname)
 
         print(f"\npause  edit 1input/, then run:")
+        print(f"  python3 editlanduse.py")
         print(f"  python3 {os.path.basename(sys.argv[0])} continue")
 
     # ── bad usage ─────────────────────────────────────────────────────────────
@@ -202,4 +205,9 @@ def main():
 
 
 if __name__ == '__main__':
+    subprocess.run(
+        'module load conda && conda activate /N/slate/$USER/conda_envs/easg690 && module use /N/slate/obrienta/software/quartz/modulefiles && module load regcm',
+        shell=True,
+        executable='/bin/bash'
+    )
     main()

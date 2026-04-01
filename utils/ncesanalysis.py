@@ -45,7 +45,7 @@ def main():
         ]
         output = f'nces_{date}.nc'
 
-        cmd_str = f"module load nco && nces {' '.join(inputs)} {output}"
+        cmd_str = f"module load nco && nces {' '.join(inputs)} -o {output}"
         print(f"Running: {cmd_str}")
         result = subprocess.run(cmd_str, shell=True, executable='/bin/bash')
         if result.returncode != 0:
